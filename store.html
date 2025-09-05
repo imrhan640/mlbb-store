@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blue & White Store — Editable Prices</title>
+  <style>
+    :root{
+      --blue: #1e88e5;
+      --dark-blue:#1565c0;
+      --muted:#f4f8fd;
+      --card: #ffffff;
+      --accent: #0d47a1;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--muted),#fff);color:#0b2540}
+    header{background:var(--blue);color:white;padding:18px 20px;display:flex;align-items:center;justify-content:space-between}
+    header h1{margin:0;font-size:18px}
+    .container{max-width:1100px;margin:26px auto;padding:0 18px}
+
+    .controls{display:flex;gap:10px;align-items:center;margin-bottom:18px}
+    .btn{background:var(--dark-blue);color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn.secondary{background:transparent;color:var(--dark-blue);border:2px solid var(--dark-blue)}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+    .card{background:var(--card);padding:12px;border-radius:14px;box-shadow:0 6px 18px rgba(13,71,161,0.06);display:flex;flex-direction:column;gap:8px}
+    .card img{width:100%;height:140px;object-fit:cover;border-radius:10px}
+    .card h3{margin:6px 0 0;font-size:16px}
+    .price{font-weight:700;color:var(--accent)}
+
+    .product-actions{display:flex;gap:8px;align-items:center}
+    input[type="number"]{width:100px;padding:6px;border-radius:8px;border:1px solid #e6eefb}
+
+    aside.cart{position:fixed;right:18px;bottom:18px;background:linear-gradient(90deg,#fff,#f8fbff);width:320px;max-width:calc(100% - 40px);border-radius:12px;padding:12px;box-shadow:0 14px 40px rgba(13,71,161,0.12)}
+    .cart h4{margin:0 0 8px}
+    .cart-list{max-height:260px;overflow:auto;margin-bottom:10px}
+    .cart-row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed #edf6ff}
+
+    footer{margin-top:28px;text-align:center;color:#6b7b8f;padding-bottom:50px}
+
+    /* small screens */
+    @media (max-width:720px){
+      aside.cart{position:static;margin-top:16px}
+      header{flex-direction:column;align-items:flex-start;gap:10px}
+    }
+
+    /* admin badge */
+    .badge{background:#eaf3ff;color:var(--dark-blue);padding:6px 8px;border-radius:8px;font-weight:600}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Blue & White Store</h1>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div id="adminIndicator" style="display:none" class="badge">Admin mode</div>
+      <button class="btn" id="toggleEdit">Toggle Edit Prices</button>
+      <button class="btn secondary" id="clearStorage">Reset Prices</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="controls">
+      <input id="search" placeholder="Search products..." style="padding:8px;border-radius:10px;border:1px solid #e6eefb;flex:1" />
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:14px;color:#5b748c">Tax %</label>
+        <input id="tax" type="number" value="0" min="0" max="100" style="width:80px;padding:6px;border-radius:8px;border:1px solid #e6eefb" />
+      </div>
+    </div>
+
+    <section class="grid" id="productsGrid">
+      <!-- product cards inserted by JS -->
+    </section>
+
+    <footer>
+      Tip: click "Toggle Edit Prices" to change product prices. Changes persist in your browser (localStorage). To hard-code prices edit the `products` array at the top of the script.
+    </footer>
+  </main>
+
+  <aside class="cart" id="cartPanel">
+    <h4>Cart</h4>
+    <div class="cart-list" id="cartList"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>Subtotal</div><div id="subtotal">₱0.00</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>Tax (<span id="taxRate">0</span>%)</div><div id="taxAmount">₱0.00</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:12px">
+      <div>Total</div><div id="grandTotal">₱0.00</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="checkoutBtn">Checkout</button>
+      <button class="btn secondary" id="emptyCart">Empty</button>
+    </div>
+  </aside>
+
+  <script>
+    // -----------------------
+    // Editable product data
+    // You can edit this array to add/remove products OR use the app "Toggle Edit Prices" to change prices.
+    // -----------------------
+    const defaultProducts = [
+      { id: 'p1', name: 'MLBB Diamonds 12', price: 12.00, img: 'https://images.pexels.com/photos/3945663/pexels-photo-3945663.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940', desc: 'Mobile Legend Diamonds pack.' },
+      { id: 'p2', name: 'Robux 80', price: 1.99, img: 'https://images.pexels.com/photos/3945683/pexels-photo-3945683.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940', desc: 'Roblox in-game currency.' },
+      { id: 'p3', name: 'Gift Card ₱100', price: 100.00, img: 'https://images.pexels.com/photos/230544/pexels-photo-230544.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940', desc: 'Instant redeemable card.' },
+      { id: 'p4', name: 'Game Skin Coupon', price: 45.50, img: 'https://images.pexels.com/photos/269630/pexels-photo-269630.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940', desc: 'Limited edition skin coupon.' }
+    ];
+
+    // Storage keys
+    const STORAGE_KEY = 'bwstore_products_v1';
+    const CART_KEY = 'bwstore_cart_v1';
+
+    // Try load saved products, otherwise default
+    let products = loadProducts();
+    let cart = loadCart();
+    let editMode = false;
+
+    const productsGrid = document.getElementById('productsGrid');
+    const cartList = document.getElementById('cartList');
+    const subtotalEl = document.getElementById('subtotal');
+    const grandTotalEl = document.getElementById('grandTotal');
+    const taxInput = document.getElementById('tax');
+    const taxRateEl = document.getElementById('taxRate');
+    const taxAmountEl = document.getElementById('taxAmount');
+
+    function loadProducts(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw){
+          return JSON.parse(raw);
+        }
+      }catch(e){console.warn('Failed loading products',e)}
+      return defaultProducts;
+    }
+    function saveProducts(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    }
+
+    function loadCart(){
+      try{const raw = localStorage.getItem(CART_KEY); if(raw) return JSON.parse(raw)}catch(e){}
+      return {};
+    }
+    function saveCart(){localStorage.setItem(CART_KEY, JSON.stringify(cart))}
+
+    // render functions
+    function renderProducts(filter=''){
+      productsGrid.innerHTML='';
+      const q = filter.trim().toLowerCase();
+      products.filter(p=>p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).forEach(p=>{
+        const el = document.createElement('div'); el.className='card';
+        el.innerHTML = `
+          <img src="${p.img}" alt="${escapeHtml(p.name)}">
+          <h3>${escapeHtml(p.name)}</h3>
+          <div style="font-size:13px;color:#6b7b8f">${escapeHtml(p.desc)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <div class="price">₱<span data-price>${formatCurrency(p.price)}</span></div>
+            <div class="product-actions">
+              <input type="number" min="1" value="1" data-qty style="width:68px;padding:6px;border-radius:8px;border:1px solid #eef7ff">
+              <button class="btn" data-buy>Add</button>
+            </div>
+          </div>
+          <div class="editRow" style="margin-top:8px;display:none">
+            <label style="font-size:13px;color:#5b748c">Price</label>
+            <input type="number" step="0.01" value="${p.price}" data-editprice>
+            <button class="btn secondary" data-saveprice>Save</button>
+          </div>
+        `;
+        // events
+        el.querySelector('[data-buy]').addEventListener('click', ()=>{
+          const qty = Number(el.querySelector('[data-qty]').value) || 1;
+          addToCart(p.id, qty);
+        });
+        el.querySelector('[data-saveprice]')?.addEventListener('click', ()=>{
+          const newPrice = Number(el.querySelector('[data-editprice]').value) || 0;
+          updatePrice(p.id, newPrice);
+        });
+        productsGrid.appendChild(el);
+      });
+      toggleEditUI();
+    }
+
+    function renderCart(){
+      cartList.innerHTML='';
+      let subtotal = 0;
+      Object.keys(cart).forEach(id=>{
+        const item = cart[id];
+        const prod = products.find(p=>p.id===id);
+        if(!prod) return;
+        const row = document.createElement('div'); row.className='cart-row';
+        const lineTotal = prod.price * item.qty;
+        subtotal += lineTotal;
+        row.innerHTML = `
+          <div style="flex:1">
+            <div style="font-weight:700">${escapeHtml(prod.name)}</div>
+            <div style="font-size:13px;color:#6b7b8f">₱${formatCurrency(prod.price)} × ${item.qty}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700">₱${formatCurrency(lineTotal)}</div>
+            <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">
+              <button class="btn secondary" data-minus data-id="${id}">-</button>
+              <button class="btn secondary" data-plus data-id="${id}">+</button>
+              <button class="btn secondary" data-remove data-id="${id}">x</button>
+            </div>
+          </div>
+        `;
+        cartList.appendChild(row);
+      });
+      subtotalEl.textContent = '₱' + formatCurrency(subtotal);
+      const taxRate = Number(taxInput.value) || 0;
+      taxRateEl.textContent = taxRate;
+      const taxAmount = subtotal * (taxRate/100);
+      taxAmountEl.textContent = '₱' + formatCurrency(taxAmount);
+      grandTotalEl.textContent = '₱' + formatCurrency(subtotal + taxAmount);
+
+      // attach cart button events
+      cartList.querySelectorAll('[data-minus]').forEach(b=>b.addEventListener('click', ()=>{
+        const id = b.getAttribute('data-id'); changeQty(id, -1);
+      }));
+      cartList.querySelectorAll('[data-plus]').forEach(b=>b.addEventListener('click', ()=>{
+        const id = b.getAttribute('data-id'); changeQty(id, +1);
+      }));
+      cartList.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click', ()=>{
+        const id = b.getAttribute('data-id'); removeFromCart(id);
+      }));
+
+      saveCart();
+    }
+
+    // helpers
+    function addToCart(id, qty=1){
+      cart[id] = cart[id] || {qty:0};
+      cart[id].qty += qty;
+      if(cart[id].qty <= 0) delete cart[id];
+      renderCart();
+      flash("Added to cart");
+    }
+    function changeQty(id, delta){
+      if(!cart[id]) return;
+      cart[id].qty += delta;
+      if(cart[id].qty <= 0) delete cart[id];
+      renderCart();
+    }
+    function removeFromCart(id){ delete cart[id]; renderCart(); }
+
+    function updatePrice(id, newPrice){
+      const idx = products.findIndex(p=>p.id===id);
+      if(idx===-1) return;
+      products[idx].price = Number(newPrice) || 0;
+      saveProducts();
+      renderProducts(document.getElementById('search').value);
+      renderCart();
+      flash('Price updated');
+    }
+
+    function toggleEditUI(){
+      document.querySelectorAll('.card').forEach((card, i)=>{
+        const row = card.querySelector('.editRow');
+        if(editMode){
+          row.style.display = 'flex';
+        } else row.style.display = 'none';
+      });
+      document.getElementById('adminIndicator').style.display = editMode ? 'inline-block' : 'none';
+    }
+
+    // UI utilities
+    function formatCurrency(v){ return Number(v).toFixed(2); }
+    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function flash(msg){
+      const el = document.createElement('div');
+      el.textContent = msg; el.style.position='fixed'; el.style.left='50%'; el.style.transform='translateX(-50%)';
+      el.style.bottom='90px'; el.style.background='var(--dark-blue)'; el.style.color='white'; el.style.padding='10px 14px';
+      el.style.borderRadius='10px'; el.style.boxShadow='0 6px 20px rgba(13,71,161,0.2)'; document.body.appendChild(el);
+      setTimeout(()=>el.remove(),1400);
+    }
+
+    // simple checkout demo
+    document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+      if(Object.keys(cart).length===0){ flash('Cart is empty'); return; }
+      const totalText = grandTotalEl.textContent;
+      alert('Checkout — This is a demo. Total: ' + totalText + '\n\nImplement real payment flow separately.');
+      // clear cart after demo
+      cart = {}; saveCart(); renderCart();
+    });
+
+    document.getElementById('emptyCart').addEventListener('click', ()=>{ if(confirm('Empty cart?')){ cart={}; saveCart(); renderCart(); } });
+
+    document.getElementById('toggleEdit').addEventListener('click', ()=>{
+      // toggle admin mode using a lightweight prompt (for local use only). You can remove or change this.
+      if(!editMode){
+        const pw = prompt('Enter admin password to edit prices (default: admin)');
+        if(pw !== 'admin'){ alert('Wrong password. Use "admin" for demo.'); return; }
+      }
+      editMode = !editMode; toggleEditUI();
+    });
+
+    document.getElementById('clearStorage').addEventListener('click', ()=>{
+      if(confirm('Reset stored prices and cart to defaults?')){
+        localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(CART_KEY); products = defaultProducts.slice(); cart={}; renderProducts(''); renderCart();
+      }
+    });
+
+    document.getElementById('search').addEventListener('input', e=>renderProducts(e.target.value));
+    taxInput.addEventListener('input', ()=>renderCart());
+
+    // initial render
+    renderProducts(''); renderCart();
+
+    // Save products when page is about to be closed (good UX)
+    window.addEventListener('beforeunload', ()=>{ saveProducts(); saveCart(); });
+
+  </script>
+</body>
+</html>
